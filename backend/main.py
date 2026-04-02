@@ -232,6 +232,6 @@ async def stats():
         "by_domain": domains,
         "by_complexity": complexity_dist,
     }
-
+app = FastAPI()
 app.mount("/frontend", StaticFiles(
     directory=os.path.join(os.path.dirname(__file__), "../frontend")), name="frontend")
