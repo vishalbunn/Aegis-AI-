@@ -34,7 +34,7 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-# ✅ FIX: Mount frontend correctly (IMPORTANT FOR VERCEL)
+# ✅ Fix: frontend path
 frontend_path = os.path.join(os.path.dirname(__file__), "../frontend")
 
 app.mount(
@@ -51,10 +51,14 @@ DOMAIN_PROMPTS = {
     "general":    "",
 }
 
+# ✅ Fix: safe startup (prevents Vercel crash)
 @app.on_event("startup")
 async def startup():
-    init_db()
-    print("🚀 Aegis AI v4.1 — all agents loaded")
+    try:
+        init_db()
+        print("🚀 Aegis AI v4.1 — DB initialized")
+    except Exception as e:
+        print("⚠️ DB init skipped (Vercel environment):", str(e))
 
 class Query(BaseModel):
     text: str
@@ -77,6 +81,7 @@ async def full_pipeline(query: str, domain: str = "general",
     domain_hint = DOMAIN_PROMPTS.get(domain, "")
     full_query = f"{context}\n\nCurrent query: {query}".strip() if context else query
 
+    # Safety
     safety = await run(safety_agent, full_query)
     if not safety.get("safe", True):
         return {"blocked": True, "final": safety.get("reason", "Query blocked.")}
@@ -91,8 +96,6 @@ async def full_pipeline(query: str, domain: str = "general",
     memory_note = detect_changed(query, similar)
 
     use_tools = routing.get("run_tools", False)
-    run_bias = routing.get("run_bias", True)
-    max_rounds = routing.get("run_consensus_rounds", 2)
 
     baseline_coro = run(baseline_agent, query) if run_baseline_flag else asyncio.sleep(0)
 
@@ -103,7 +106,6 @@ async def full_pipeline(query: str, domain: str = "general",
     )
 
     critique = await run(critic_agent, pros, cons, query)
-
     final_r = await run(final_agent, full_query, pros, cons, critique)
 
     scores = await run(scoring_agent, query, final_r, pros, cons)
@@ -122,7 +124,7 @@ async def full_pipeline(query: str, domain: str = "general",
 
 # ================= ROUTES =================
 
-# ✅ FIX: Serve frontend
+# ✅ Serve frontend
 @app.get("/")
 def home():
     return FileResponse(os.path.join(frontend_path, "index.html"))
@@ -141,7 +143,10 @@ async def compare(q: CompareQuery):
 
 @app.get("/history")
 async def history(limit: int = 100):
-    return get_all_decisions(limit)
+    try:
+        return get_all_decisions(limit)
+    except Exception as e:
+        raise HTTPException(500, str(e))
 
 @app.get("/history/{decision_id}")
 async def history_item(decision_id: int):
