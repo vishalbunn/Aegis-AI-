@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+.pytest_cache/
+
+# Virtual envs
+venv/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Secrets - NEVER COMMIT
+.env
+.env.local
+*.pem
+*.key
+
+# Eval outputs (regenerated per run)
+eval/results_*.json
+eval/results_*.md
+
+# Local data
+*.db
+backend/decisions.db
+backend/memory.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.log
+node_modules/
+
+# Old archive
+Aegis-AI--main.zip
+old/

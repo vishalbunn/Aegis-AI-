@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Aegis AI v5 — Multi-Agent Debate</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Instrument+Serif:ital@0;1&family=Geist+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{--ink:#0a0a0f;--paper:#f5f0e8;--gold:#c9a84c;--pro:#1a6b3c;--con:#8b1a1a;--neutral:#2a2a3a;--muted:#888;--rule:rgba(10,10,15,0.12);--impact:#1a4a8b;--cost:#6b1a6b}
+html{scroll-behavior:smooth}
+body{font-family:'Geist Mono',monospace;background:var(--paper);color:var(--ink);min-height:100vh;cursor:none;overflow-x:hidden}
+#cursor{position:fixed;width:12px;height:12px;background:var(--ink);border-radius:50%;pointer-events:none;z-index:9999;transition:transform .15s,background .2s;mix-blend-mode:multiply}
+#cursor-ring{position:fixed;width:36px;height:36px;border:1px solid var(--ink);border-radius:50%;pointer-events:none;z-index:9998;transition:all .25s;mix-blend-mode:multiply}
+body.hovering #cursor{transform:scale(3);background:var(--gold)}
+body.hovering #cursor-ring{transform:scale(.5);opacity:0}
+body::after{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");pointer-events:none;z-index:9997;opacity:.6}
+.ticker-wrap{position:fixed;top:0;left:0;right:0;z-index:200;background:var(--ink);color:var(--paper);overflow:hidden;height:32px;display:flex;align-items:center}
+.ticker-inner{display:flex;animation:ticker 26s linear infinite;white-space:nowrap}
+.ticker-item{font-size:10px;letter-spacing:.2em;text-transform:uppercase;padding:0 40px;display:flex;align-items:center;gap:16px}
+.ticker-dot{width:4px;height:4px;background:var(--gold);border-radius:50%;flex-shrink:0}
+@keyframes ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.nav-bar{position:sticky;top:32px;z-index:150;background:var(--paper);border-bottom:1px solid var(--rule);display:flex;align-items:center;padding:0 60px}
+.nav-tab{font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:.1em;padding:14px 24px;border-bottom:2px solid transparent;cursor:none;color:var(--muted);transition:color .2s,border-color .2s}
+.nav-tab.active{color:var(--ink);border-bottom-color:var(--ink)}
+.nav-tab:hover{color:var(--ink)}
+.page{padding-top:32px;min-height:100vh}
+.view{display:none}.view.active{display:block}
+
+.hero{padding:80px 60px 40px;display:grid;grid-template-columns:1fr auto;align-items:end;gap:40px;border-bottom:1px solid var(--rule)}
+.overline{font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:10px;margin-bottom:20px}
+.overline::before{content:'';display:block;width:30px;height:1px;background:var(--muted)}
+.hero-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(72px,10vw,140px);line-height:.9;letter-spacing:-.02em}
+.hero-title em{font-family:'Instrument Serif',serif;font-style:italic;color:var(--gold)}
+.hero-right{text-align:right;padding-bottom:8px}
+.issue-badge{font-size:10px;letter-spacing:.15em;color:var(--muted);border:1px solid var(--rule);padding:6px 12px;border-radius:2px;display:inline-block;margin-bottom:16px}
+.hero-desc{font-size:11px;line-height:1.8;color:var(--muted);max-width:240px;margin-left:auto}
+
+.input-section{padding:40px 60px;border-bottom:1px solid var(--rule);display:grid;grid-template-columns:1fr 300px}
+.input-left{border-right:1px solid var(--rule);padding-right:60px}
+.domain-row{display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap}
+.domain-btn{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.2em;text-transform:uppercase;padding:6px 12px;border:1px solid var(--rule);background:transparent;color:var(--muted);cursor:none;transition:all .2s;border-radius:2px}
+.domain-btn.active,.domain-btn:hover{border-color:var(--ink);color:var(--ink)}
+.domain-btn.active{background:var(--ink);color:var(--paper)}
+.input-label{font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:var(--muted);margin-bottom:16px;display:block}
+.big-input{font-family:'Instrument Serif',serif;font-size:clamp(20px,2.5vw,32px);font-style:italic;background:transparent;border:none;border-bottom:2px solid var(--ink);outline:none;width:100%;padding:10px 0 14px;color:var(--ink);transition:border-color .3s;line-height:1.3}
+.big-input::placeholder{color:rgba(10,10,15,.25)}
+.big-input:focus{border-color:var(--gold)}
+.context-input{font-family:'Geist Mono',monospace;font-size:12px;background:transparent;border:none;border-bottom:1px solid var(--rule);outline:none;width:100%;padding:8px 0;color:var(--muted);margin-top:16px;transition:border-color .3s}
+.context-input:focus{border-color:var(--muted)}
+.context-input::placeholder{color:rgba(10,10,15,.2)}
+.char-count{font-size:10px;color:var(--muted);margin-top:8px}
+.input-right{padding-left:60px;display:flex;flex-direction:column;justify-content:flex-end;gap:14px}
+.analyze-btn{position:relative;background:var(--ink);color:var(--paper);border:none;padding:20px 32px;font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:.1em;cursor:none;overflow:hidden;transition:color .3s;text-align:left;display:flex;align-items:center;justify-content:space-between}
+.analyze-btn::after{content:'';position:absolute;inset:0;background:var(--gold);transform:scaleX(0);transform-origin:left;transition:transform .4s cubic-bezier(.77,0,.18,1);z-index:0}
+.analyze-btn:hover::after{transform:scaleX(1)}
+.analyze-btn span,.analyze-btn svg{position:relative;z-index:1}
+.analyze-btn:hover{color:var(--ink)}
+.analyze-btn:disabled{opacity:.4}
+.btn-arrow{transition:transform .3s}
+.analyze-btn:hover .btn-arrow{transform:translate(4px,-4px)}
+.opt-row{display:flex;align-items:center;gap:10px;font-size:10px;color:var(--muted)}
+.opt-toggle{width:28px;height:16px;background:var(--rule);border-radius:8px;position:relative;cursor:none;transition:background .2s;flex-shrink:0}
+.opt-toggle.on{background:var(--ink)}
+.opt-toggle::after{content:'';position:absolute;width:12px;height:12px;background:var(--paper);border-radius:50%;top:2px;left:2px;transition:transform .2s}
+.opt-toggle.on::after{transform:translateX(12px)}
+.hint-text{font-size:10px;color:var(--muted);line-height:1.7}
+
+.mode-row{display:flex;gap:6px;margin-top:8px}
+.mode-btn{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.15em;text-transform:uppercase;padding:6px 10px;border:1px solid var(--rule);background:transparent;color:var(--muted);cursor:none;transition:all .2s;flex:1}
+.mode-btn.active{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.mode-btn:hover{border-color:var(--ink);color:var(--ink)}
+.mode-btn.active:hover{color:var(--paper)}
+
+.uncertainty-banner{display:none;padding:16px 60px;background:#fff8e8;border-left:3px solid var(--gold);border-bottom:1px solid var(--rule)}
+.uncertainty-banner.visible{display:block}
+.uncertainty-title{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);margin-bottom:8px}
+.uncertainty-questions{list-style:none}
+.uncertainty-questions li{font-size:12px;color:var(--neutral);padding-left:12px;border-left:2px solid var(--gold);margin-top:4px}
+.memory-note{display:none;padding:12px 60px;background:#e8f0ff;border-left:3px solid var(--impact);border-bottom:1px solid var(--rule);font-size:12px;color:var(--impact)}
+.memory-note.visible{display:block}
+.error-strip{display:none;padding:16px 60px;background:#fff0f0;border-left:3px solid var(--con);font-size:12px;color:var(--con)}
+.error-strip.visible{display:block}
+
+.safety-block{display:none;padding:60px;text-align:center;border-bottom:1px solid var(--rule)}
+.safety-block.visible{display:block}
+.safety-icon{font-family:'Bebas Neue',sans-serif;font-size:64px;color:var(--con);line-height:1;margin-bottom:16px}
+.safety-title{font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--con);margin-bottom:12px}
+.safety-reason{font-size:14px;color:var(--muted);max-width:500px;margin:0 auto}
+
+.loading-state{display:none;padding:60px;border-bottom:1px solid var(--rule)}
+.loading-state.visible{display:block}
+.loading-bar-wrap{height:2px;background:var(--rule);overflow:hidden;margin-bottom:20px}
+.loading-bar{height:100%;background:linear-gradient(90deg,var(--gold),var(--ink));animation:loadbar 1.8s ease-in-out infinite}
+@keyframes loadbar{0%{width:0;margin-left:0}50%{width:60%;margin-left:20%}100%{width:0;margin-left:100%}}
+.loading-label{font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.loading-sub{font-size:11px;color:var(--muted);margin-bottom:16px}
+.loading-agents{display:flex;gap:20px;flex-wrap:wrap}
+.agent-step{display:flex;align-items:center;gap:8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);opacity:.3;transition:opacity .5s}
+.agent-step.active{opacity:1;color:var(--ink)}.agent-step.done{opacity:.6}
+.agent-dot{width:6px;height:6px;border-radius:50%;background:var(--muted);transition:background .3s}
+.agent-step.active .agent-dot{background:var(--gold);box-shadow:0 0 8px var(--gold);animation:pulse 1s ease infinite}
+.agent-step.done .agent-dot{background:var(--ink)}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.5)}}
+
+.results{display:none}.results.visible{display:block}
+
+.result-toolbar{display:flex;align-items:center;gap:10px;padding:14px 60px;border-bottom:1px solid var(--rule);flex-wrap:wrap}
+.toolbar-btn{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;background:transparent;border:1px solid var(--rule);padding:7px 14px;cursor:none;color:var(--muted);transition:all .2s;display:flex;align-items:center;gap:6px}
+.toolbar-btn:hover{border-color:var(--ink);color:var(--ink)}
+.toolbar-btn.copied{border-color:var(--pro);color:var(--pro)}
+.toolbar-spacer{flex:1}
+.result-meta{font-size:10px;color:var(--muted);letter-spacing:.08em}
+.orch-badge{font-size:9px;letter-spacing:.15em;text-transform:uppercase;padding:4px 10px;border-radius:2px;border:1px solid var(--rule)}
+.orch-badge.simple{color:var(--pro);border-color:rgba(26,107,60,.3)}
+.orch-badge.moderate{color:var(--gold);border-color:rgba(201,168,76,.3)}
+.orch-badge.complex{color:var(--con);border-color:rgba(139,26,26,.3)}
+.search-badge{font-size:9px;letter-spacing:.15em;text-transform:uppercase;padding:4px 10px;border-radius:2px;background:rgba(26,74,139,.08);color:var(--impact);border:1px solid rgba(26,74,139,.2)}
+.mode-badge{font-size:9px;letter-spacing:.15em;text-transform:uppercase;padding:4px 10px;border-radius:2px;background:rgba(10,10,15,.06);color:var(--ink)}
+
+.verdict-strip{background:var(--ink);color:var(--paper);padding:40px 60px;display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid var(--gold)}
+.verdict-prefix{font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:rgba(245,240,232,.4);margin-bottom:8px}
+.verdict-headline{font-family:'Bebas Neue',sans-serif;font-size:clamp(32px,4vw,56px);line-height:1}
+.verdict-headline.yes{color:#6ecf9a}.verdict-headline.no{color:#f08080}.verdict-headline.conditional{color:var(--gold)}.verdict-headline.balanced{color:var(--gold)}
+.verdict-right{display:flex;flex-direction:column;align-items:flex-end;gap:10px}
+.rounds-badge{font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:rgba(245,240,232,.4);padding:4px 10px;border:1px solid rgba(245,240,232,.15);border-radius:2px}
+.confidence-row{display:flex;align-items:center;gap:14px;justify-content:flex-end}
+.confidence-label{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:rgba(245,240,232,.4)}
+.confidence-bar-wrap{width:120px;height:2px;background:rgba(255,255,255,.1)}
+.confidence-bar-fill{height:100%;background:var(--gold);transition:width 1s cubic-bezier(.77,0,.18,1)}
+.confidence-num{font-family:'Bebas Neue',sans-serif;font-size:22px;min-width:36px;text-align:right;color:var(--gold)}
+
+.score-dashboard{display:grid;grid-template-columns:repeat(5,1fr);border-bottom:1px solid var(--rule)}
+.score-cell{padding:28px 24px;border-right:1px solid var(--rule);position:relative;overflow:hidden;transition:background .3s}
+.score-cell:last-child{border-right:none}
+.score-cell-bg{position:absolute;bottom:0;left:0;right:0;height:0%;transition:height 1.4s cubic-bezier(.77,0,.18,1);opacity:.07;pointer-events:none}
+.score-cell-label{font-size:9px;letter-spacing:.25em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;position:relative;z-index:1}
+.score-cell-value{font-family:'Bebas Neue',sans-serif;font-size:44px;line-height:1;margin-bottom:4px;position:relative;z-index:1}
+.score-cell-reason{font-size:10px;color:var(--muted);line-height:1.5;position:relative;z-index:1}
+.score-cell-bar{height:2px;background:var(--rule);margin-top:10px;position:relative;z-index:1}
+.score-cell-bar-fill{height:100%;width:0%;transition:width 1.4s cubic-bezier(.77,0,.18,1)}
+.sv-feasibility,.sb-feasibility,.sbg-feasibility{color:var(--pro);background:var(--pro)}
+.sv-risk,.sb-risk,.sbg-risk{color:var(--con);background:var(--con)}
+.sv-confidence,.sb-confidence,.sbg-confidence{color:var(--gold);background:var(--gold)}
+.sv-impact,.sb-impact,.sbg-impact{color:var(--impact);background:var(--impact)}
+.sv-cost,.sb-cost,.sbg-cost{color:var(--cost);background:var(--cost)}
+
+.bias-banner{display:none;padding:16px 60px;border-bottom:1px solid var(--rule);background:#fff5f5;border-left:3px solid var(--con)}
+.bias-banner.visible{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.bias-cell-title{font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--con);margin-bottom:4px}
+.bias-cell-text{font-size:12px;color:var(--neutral);line-height:1.5}
+.bias-cell-quote{font-style:italic;color:var(--muted);font-size:11px;margin-top:4px}
+.bias-severity{display:inline-block;padding:2px 8px;border-radius:2px;font-size:9px;letter-spacing:.15em;text-transform:uppercase}
+.bias-severity.low{background:rgba(26,107,60,.1);color:var(--pro)}
+.bias-severity.medium{background:rgba(201,168,76,.1);color:var(--gold)}
+.bias-severity.high{background:rgba(139,26,26,.1);color:var(--con)}
+
+.analysis-grid{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--rule)}
+.analysis-col{padding:56px 60px}
+.analysis-col:first-child{border-right:1px solid var(--rule)}
+.col-header{display:flex;align-items:center;gap:16px;margin-bottom:36px;padding-bottom:20px;border-bottom:1px solid var(--rule)}
+.col-number{font-family:'Bebas Neue',sans-serif;font-size:48px;line-height:1;opacity:.08}
+.col-tag{font-size:9px;letter-spacing:.3em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.col-title{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:.05em}
+.col-title.pro-title{color:var(--pro)}.col-title.con-title{color:var(--con)}
+.analysis-text{font-family:'Instrument Serif',serif;font-size:16px;line-height:1.75;color:var(--neutral);margin-bottom:28px;white-space:pre-wrap}
+.point-list{list-style:none;display:flex;flex-direction:column}
+.point-item{display:grid;grid-template-columns:24px 1fr;gap:12px;align-items:start;padding:12px 0;border-bottom:1px solid var(--rule);transition:background .2s}
+.point-item:hover{background:rgba(10,10,15,.02)}
+.point-index{font-size:9px;color:var(--muted);padding-top:2px}
+.point-title{font-family:'Geist Mono',monospace;font-size:11px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;margin-bottom:3px}
+.point-title.pro-point{color:var(--pro)}.point-title.con-point{color:var(--con)}
+.point-desc{font-size:13px;line-height:1.6;color:#555}
+
+.rounds-explorer{padding:24px 60px;border-bottom:1px solid var(--rule);background:rgba(10,10,15,.02)}
+.rounds-tabs{display:flex;gap:8px;margin-bottom:16px}
+.round-tab{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.15em;text-transform:uppercase;padding:6px 12px;border:1px solid var(--rule);background:transparent;color:var(--muted);cursor:none;transition:all .2s}
+.round-tab.active{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.round-content{display:none;grid-template-columns:1fr 1fr;gap:30px}
+.round-content.active{display:grid}
+.round-side{font-size:13px;line-height:1.6;color:var(--neutral);white-space:pre-wrap}
+.round-side-label{font-size:9px;letter-spacing:.2em;text-transform:uppercase;margin-bottom:8px}
+.round-side-label.pro{color:var(--pro)}.round-side-label.con{color:var(--con)}
+
+.consensus-panel{padding:40px 60px;border-bottom:1px solid var(--rule);display:grid;grid-template-columns:1fr auto;gap:40px;align-items:start}
+.consensus-label{font-size:9px;letter-spacing:.3em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.consensus-label::after{content:'';flex:1;height:1px;background:var(--rule)}
+.consensus-text{font-family:'Instrument Serif',serif;font-size:16px;line-height:1.7;color:var(--neutral)}
+.stability-meter{text-align:center;min-width:80px}
+.stability-value{font-family:'Bebas Neue',sans-serif;font-size:40px;color:var(--ink)}
+.stability-label{font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+.key-points{margin-top:16px;display:flex;flex-direction:column;gap:6px}
+.key-point{font-size:12px;color:var(--muted);padding-left:12px;border-left:2px solid var(--rule)}
+
+.bottom-grid{display:grid;grid-template-columns:1fr 1fr}
+.critique-col{padding:56px 60px;border-right:1px solid var(--rule)}
+.final-col{padding:56px 60px;background:var(--ink);color:var(--paper)}
+.section-eyebrow{font-size:9px;letter-spacing:.3em;text-transform:uppercase;color:var(--muted);margin-bottom:20px;display:flex;align-items:center;gap:10px}
+.section-eyebrow::after{content:'';flex:1;height:1px;background:var(--rule)}
+.final-col .section-eyebrow{color:rgba(245,240,232,.3)}.final-col .section-eyebrow::after{background:rgba(245,240,232,.1)}
+.critique-text{font-family:'Instrument Serif',serif;font-size:15px;line-height:1.8;color:var(--neutral);white-space:pre-wrap}
+.final-decision{font-family:'Bebas Neue',sans-serif;font-size:clamp(24px,3vw,40px);line-height:1.1;color:var(--gold);margin-bottom:16px}
+.final-body{font-family:'Instrument Serif',serif;font-size:15px;line-height:1.8;color:rgba(245,240,232,.7);white-space:pre-wrap}
+.final-conditions{margin-top:16px}
+.final-condition{font-size:12px;color:rgba(245,240,232,.6);padding-left:12px;border-left:2px solid var(--gold);margin-top:6px}
+
+.history-header{padding:60px 60px 40px;border-bottom:1px solid var(--rule);display:flex;align-items:flex-end;justify-content:space-between}
+.history-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(40px,6vw,80px);line-height:.9}
+.history-title em{font-family:'Instrument Serif',serif;font-style:italic;color:var(--gold)}
+.history-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.search-wrap{position:relative}
+.search-input{font-family:'Geist Mono',monospace;font-size:11px;background:transparent;border:1px solid var(--rule);padding:9px 14px 9px 34px;outline:none;color:var(--ink);width:220px;transition:border-color .2s}
+.search-input:focus{border-color:var(--ink)}
+.search-input::placeholder{color:var(--muted)}
+.search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:12px;pointer-events:none}
+.filter-select{font-family:'Geist Mono',monospace;font-size:10px;background:transparent;border:1px solid var(--rule);padding:9px 12px;color:var(--muted);outline:none}
+.icon-btn{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;background:transparent;border:1px solid var(--rule);padding:9px 14px;cursor:none;color:var(--muted);transition:all .2s}
+.icon-btn:hover{border-color:var(--ink);color:var(--ink)}
+.history-list{padding:0 60px 60px}
+.history-empty{padding:60px 0;text-align:center;color:var(--muted);font-size:12px;letter-spacing:.2em;text-transform:uppercase}
+.history-item{display:grid;grid-template-columns:56px 1fr auto;gap:20px;align-items:start;padding:24px 0;border-bottom:1px solid var(--rule);cursor:none;transition:background .2s}
+.history-item:hover{background:rgba(10,10,15,.02);margin:0 -60px;padding-left:60px;padding-right:60px}
+.h-index{font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--rule);line-height:1}
+.h-query{font-family:'Instrument Serif',serif;font-size:17px;font-style:italic;color:var(--ink);margin-bottom:6px;line-height:1.3}
+.h-final{font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:8px}
+.h-meta{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.h-tag{font-size:9px;letter-spacing:.15em;text-transform:uppercase;padding:3px 8px;border-radius:2px}
+.h-tag.yes{background:rgba(26,107,60,.1);color:var(--pro)}.h-tag.no{background:rgba(139,26,26,.1);color:var(--con)}.h-tag.conditional{background:rgba(201,168,76,.1);color:var(--gold)}.h-tag.blocked{background:rgba(139,26,26,.15);color:var(--con)}
+.h-domain{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:3px 8px;border:1px solid var(--rule)}
+.h-date{font-size:10px;color:var(--muted)}
+.h-right{display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+.h-actions{display:flex;gap:6px}
+.h-action-btn{font-size:9px;letter-spacing:.12em;text-transform:uppercase;background:transparent;border:1px solid var(--rule);padding:5px 10px;cursor:none;color:var(--muted);transition:all .2s}
+.h-action-btn:hover{border-color:var(--ink);color:var(--ink)}
+.h-action-btn.copied{border-color:var(--pro);color:var(--pro)}
+
+.footer-rule{border:none;border-top:1px solid var(--rule);margin:0 60px;padding:28px 0;display:flex;justify-content:space-between;align-items:center}
+.footer-rule p{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+
+@media print{
+  #cursor,#cursor-ring,.ticker-wrap,.nav-bar,.result-toolbar,.input-section,.hero,.loading-state,.error-strip,.footer-rule,.uncertainty-banner,.memory-note{display:none!important}
+  body{background:white;color:black}body::after{display:none}.page{padding-top:0}
+  .results{display:block!important}
+  .verdict-strip,.final-col{background:#0a0a0f!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  @page{margin:20mm}
+}
+@media(max-width:900px){
+  .hero,.history-header{padding:50px 24px 30px}
+  .nav-bar{padding:0 16px}.nav-tab{padding:14px 12px;font-size:12px}
+  .input-section{grid-template-columns:1fr;padding:32px 24px}
+  .input-left{border-right:none;padding-right:0;border-bottom:1px solid var(--rule);padding-bottom:32px}
+  .input-right{padding-left:0;padding-top:24px}
+  .analysis-grid,.bottom-grid,.score-dashboard{grid-template-columns:1fr}
+  .analysis-col:first-child,.critique-col{border-right:none;border-bottom:1px solid var(--rule)}
+  .analysis-col,.critique-col,.final-col{padding:36px 24px}
+  .score-dashboard{grid-template-columns:repeat(2,1fr)}
+  .verdict-strip,.result-toolbar{flex-direction:column;align-items:flex-start;gap:12px;padding:28px 24px}
+  .consensus-panel{grid-template-columns:1fr;padding:28px 24px}
+  .bias-banner.visible{grid-template-columns:1fr}
+  .loading-state{padding:36px 24px}
+  .footer-rule,.history-list{margin:0;padding-left:24px;padding-right:24px}
+  .history-item{grid-template-columns:40px 1fr}
+  .h-right{display:none}
+  .uncertainty-banner,.memory-note,.rounds-explorer{padding:14px 24px}
+  .round-content.active{grid-template-columns:1fr}
+  .history-controls{flex-direction:column;align-items:flex-start}
+  .search-input{width:100%}
+}
+</style>
+</head>
+<body>
+<div id="cursor"></div><div id="cursor-ring"></div>
+<div class="ticker-wrap"><div class="ticker-inner">
+  <div class="ticker-item"><div class="ticker-dot"></div>AEGIS AI V5<div class="ticker-dot"></div>SEQUENTIAL DEBATE · BIAS AUDIT · CALIBRATED VERDICTS<div class="ticker-dot"></div>RESEARCH ON MULTI-AGENT DELIBERATION<div class="ticker-dot"></div>GROQ LLAMA 3.1 + 3.3</div>
+  <div class="ticker-item"><div class="ticker-dot"></div>AEGIS AI V5<div class="ticker-dot"></div>SEQUENTIAL DEBATE · BIAS AUDIT · CALIBRATED VERDICTS<div class="ticker-dot"></div>RESEARCH ON MULTI-AGENT DELIBERATION<div class="ticker-dot"></div>GROQ LLAMA 3.1 + 3.3</div>
+</div></div>
+
+<nav class="nav-bar">
+  <div class="nav-tab active" onclick="switchView('analyze')">Analyze</div>
+  <div class="nav-tab" onclick="switchView('history')">History</div>
+</nav>
+
+<div class="page">
+
+<div class="view active" id="view-analyze">
+  <section class="hero">
+    <div class="hero-left">
+      <div class="overline">Multi-Agent Debate System v5.0</div>
+      <h1 class="hero-title">AEGIS<br/><em>AI</em></h1>
+    </div>
+    <div class="hero-right">
+      <div class="issue-badge">SEQUENTIAL DEBATE · BIAS AUDIT · 30-QUERY BENCHMARK</div>
+      <p class="hero-desc">A research system testing whether sequential debate beats parallel monologue in multi-agent decision support.</p>
+    </div>
+  </section>
+
+  <section class="input-section">
+    <div class="input-left">
+      <div class="domain-row">
+        <button class="domain-btn active" data-domain="general" onclick="setDomain(this)">General</button>
+        <button class="domain-btn" data-domain="business" onclick="setDomain(this)">Business</button>
+        <button class="domain-btn" data-domain="career" onclick="setDomain(this)">Career</button>
+        <button class="domain-btn" data-domain="tech" onclick="setDomain(this)">Tech</button>
+        <button class="domain-btn" data-domain="healthcare" onclick="setDomain(this)">Healthcare</button>
+      </div>
+      <label class="input-label" for="queryInput">State your decision</label>
+      <input type="text" id="queryInput" class="big-input" placeholder="Should I quit my job and start a startup?" maxlength="200" autocomplete="off"/>
+      <input type="text" id="contextInput" class="context-input" placeholder="Optional: context from previous turns…" maxlength="300"/>
+      <div class="char-count"><span id="charCount">0</span> / 200</div>
+    </div>
+    <div class="input-right">
+      <button class="analyze-btn" id="analyzeBtn" onclick="runAnalysis()">
+        <span>ANALYZE</span>
+        <svg class="btn-arrow" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 16L16 4M16 4H8M16 4V12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
+      <div class="mode-row">
+        <button class="mode-btn" id="modeParallel" onclick="setMode('parallel')">Parallel</button>
+        <button class="mode-btn active" id="modeSequential" onclick="setMode('sequential')">Sequential</button>
+      </div>
+      <p class="hint-text">Sequential = Pro/Con see each other across rounds. Parallel = independent monologue.</p>
+    </div>
+  </section>
+
+  <div class="uncertainty-banner" id="uncertaintyBanner"><div class="uncertainty-title">Query has ambiguities — consider clarifying</div><ul class="uncertainty-questions" id="uncertaintyList"></ul></div>
+  <div class="memory-note" id="memoryNote"></div>
+  <div class="error-strip" id="errorStrip"></div>
+  <div class="safety-block" id="safetyBlock"><div class="safety-icon">⊘</div><div class="safety-title">Query Blocked</div><div class="safety-reason" id="safetyReason"></div></div>
+
+  <div class="loading-state" id="loadingState">
+    <div class="loading-bar-wrap"><div class="loading-bar"></div></div>
+    <div class="loading-label">Running deliberative pipeline</div>
+    <div class="loading-sub" id="loadingSub">Initializing…</div>
+    <div class="loading-agents">
+      <div class="agent-step" id="step-safety"><div class="agent-dot"></div>Safety</div>
+      <div class="agent-step" id="step-orch"><div class="agent-dot"></div>Orchestrator</div>
+      <div class="agent-step" id="step-debate"><div class="agent-dot"></div>Debate</div>
+      <div class="agent-step" id="step-critic"><div class="agent-dot"></div>Critic</div>
+      <div class="agent-step" id="step-final"><div class="agent-dot"></div>Verdict</div>
+      <div class="agent-step" id="step-bias"><div class="agent-dot"></div>Bias</div>
+      <div class="agent-step" id="step-scoring"><div class="agent-dot"></div>Scoring</div>
+      <div class="agent-step" id="step-consensus"><div class="agent-dot"></div>Consensus</div>
+    </div>
+  </div>
+
+  <section class="results" id="results">
+    <div class="result-toolbar">
+      <button class="toolbar-btn" onclick="exportPDF()">⬇ Export PDF</button>
+      <div class="orch-badge" id="orchBadge"></div>
+      <div class="mode-badge" id="modeBadge"></div>
+      <div class="search-badge" id="searchBadge" style="display:none">Web search used</div>
+      <div class="toolbar-spacer"></div>
+      <div class="result-meta" id="resultMeta"></div>
+    </div>
+
+    <div class="verdict-strip">
+      <div>
+        <div class="verdict-prefix">Final Verdict</div>
+        <div class="verdict-headline" id="verdictHeadline">—</div>
+      </div>
+      <div class="verdict-right">
+        <div class="rounds-badge" id="roundsBadge">—</div>
+        <div class="confidence-row"><span class="confidence-label">Confidence</span><div class="confidence-bar-wrap"><div class="confidence-bar-fill" id="confBar" style="width:0%"></div></div><span class="confidence-num" id="confNum">—</span></div>
+      </div>
+    </div>
+
+    <div class="score-dashboard" id="scoreDashboard"></div>
+    <div class="bias-banner" id="biasBanner"></div>
+
+    <div class="analysis-grid">
+      <div class="analysis-col">
+        <div class="col-header"><div class="col-number">01</div><div><div class="col-tag">Final round — in favor</div><div class="col-title pro-title">PRO</div></div></div>
+        <div class="analysis-text" id="proText"></div><ul class="point-list" id="proList"></ul>
+      </div>
+      <div class="analysis-col">
+        <div class="col-header"><div class="col-number">02</div><div><div class="col-tag">Final round — against</div><div class="col-title con-title">CON</div></div></div>
+        <div class="analysis-text" id="conText"></div><ul class="point-list" id="conList"></ul>
+      </div>
+    </div>
+
+    <div class="rounds-explorer" id="roundsExplorer" style="display:none">
+      <div class="section-eyebrow">Debate rounds — see how arguments evolved</div>
+      <div class="rounds-tabs" id="roundsTabs"></div>
+      <div id="roundsContent"></div>
+    </div>
+
+    <div class="consensus-panel">
+      <div>
+        <div class="consensus-label">03 — Consensus</div>
+        <div class="consensus-text" id="consensusText"></div>
+        <div class="key-points" id="keyPoints"></div>
+      </div>
+      <div class="stability-meter"><div class="stability-value" id="stabilityValue">—</div><div class="stability-label">Stability</div></div>
+    </div>
+
+    <div class="bottom-grid">
+      <div class="critique-col"><div class="section-eyebrow">04 — Critic Analysis</div><div class="critique-text" id="critiqueText"></div></div>
+      <div class="final-col"><div class="section-eyebrow">05 — Verdict & Reasoning</div><div class="final-decision" id="finalDecision"></div><div class="final-body" id="finalBody"></div><div class="final-conditions" id="finalConditions"></div></div>
+    </div>
+  </section>
+
+  <div class="footer-rule"><p>Aegis AI v5 — Sequential Debate Research</p><p>© 2026</p></div>
+</div>
+
+<div class="view" id="view-history">
+  <div class="history-header">
+    <div><div class="overline">Past Decisions</div><h2 class="history-title">DECISION<br/><em>History</em></h2></div>
+    <div class="history-controls">
+      <div class="search-wrap"><span class="search-icon">⌕</span><input type="text" class="search-input" id="searchInput" placeholder="Search decisions…" oninput="filterHistory()"/></div>
+      <select class="filter-select" id="filterVerdict" onchange="filterHistory()"><option value="">All verdicts</option><option value="yes">Yes</option><option value="no">No</option><option value="conditional">Conditional</option></select>
+      <select class="filter-select" id="filterDomain" onchange="filterHistory()"><option value="">All domains</option><option value="general">General</option><option value="business">Business</option><option value="career">Career</option><option value="tech">Tech</option><option value="healthcare">Healthcare</option></select>
+      <button class="icon-btn" onclick="loadHistory()">↻ Refresh</button>
+    </div>
+  </div>
+  <div class="history-list" id="historyList"><div class="history-empty">Loading…</div></div>
+  <div class="footer-rule"><p>Aegis AI v5 — Memory</p><p>JSON · Persistent</p></div>
+</div>
+
+</div>
+
+<script>
+// ── CURSOR ──
+const cursor=document.getElementById('cursor'),ring=document.getElementById('cursor-ring');
+let mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;cursor.style.left=mx-6+'px';cursor.style.top=my-6+'px';});
+(function a(){rx+=(mx-rx-18)*.12;ry+=(my-ry-18)*.12;ring.style.left=rx+'px';ring.style.top=ry+'px';requestAnimationFrame(a);})();
+function addHover(el){el.addEventListener('mouseenter',()=>document.body.classList.add('hovering'));el.addEventListener('mouseleave',()=>document.body.classList.remove('hovering'));}
+document.querySelectorAll('button,input,a,.nav-tab,select').forEach(addHover);
+
+let currentDomain='general',allHistory=[],debateMode='sequential';
+
+function setDomain(btn){document.querySelectorAll('.domain-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');currentDomain=btn.dataset.domain;}
+function setMode(m){debateMode=m;document.getElementById('modeParallel').classList.toggle('active',m==='parallel');document.getElementById('modeSequential').classList.toggle('active',m==='sequential');}
+
+function switchView(v){
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('view-'+v).classList.add('active');
+  document.querySelectorAll('.nav-tab').forEach(t=>{if(t.textContent.toLowerCase()===v)t.classList.add('active');});
+  if(v==='history')loadHistory();
+}
+
+const queryInput=document.getElementById('queryInput');
+queryInput.addEventListener('input',()=>document.getElementById('charCount').textContent=queryInput.value.length);
+queryInput.addEventListener('keydown',e=>{if(e.key==='Enter')runAnalysis();});
+
+// ── AGENT STEPS ──
+const STEPS=['safety','orch','debate','critic','final','bias','scoring','consensus'];
+const STEP_SUBS=['Checking safety…','Routing query…','Running debate rounds…','Running critique…','Synthesizing verdict…','Auditing bias…','Computing scores…','Stabilizing consensus…'];
+let stepTimer=null;
+function startSteps(){
+  STEPS.forEach(s=>document.getElementById('step-'+s).className='agent-step');
+  let i=0;
+  stepTimer=setInterval(()=>{
+    if(i>0)document.getElementById('step-'+STEPS[i-1]).className='agent-step done';
+    if(i<STEPS.length){document.getElementById('step-'+STEPS[i]).className='agent-step active';document.getElementById('loadingSub').textContent=STEP_SUBS[i];}
+    i++;if(i>STEPS.length)clearInterval(stepTimer);
+  },1100);
+}
+function stopSteps(){clearInterval(stepTimer);STEPS.forEach(s=>document.getElementById('step-'+s).className='agent-step done');}
+
+// ── DEFENSIVE TEXT CLEANER ──
+// Handles: null, undefined, arrays (pro_rounds), numbers, objects, strings.
+// This is the function that crashed before — now it's bulletproof.
+function cleanMd(text){
+  if(text==null)return '';
+  if(Array.isArray(text))text=text.join('\n\n--- next round ---\n\n');
+  if(typeof text!=='string')text=String(text);
+  return text
+    .replace(/\*{1,3}([^*\n]+)\*{1,3}/g,'$1')
+    .replace(/^#{1,6}\s+/gm,'')
+    .replace(/__([^_]+)__/g,'$1')
+    .replace(/`([^`]+)`/g,'$1')
+    .trim();
+}
+
+// ── POINT PARSER ──
+function parsePoints(text){
+  if(!text)return[];
+  const cleaned=cleanMd(text);
+  const lines=cleaned.split(/\n/).map(l=>l.trim()).filter(Boolean);
+  const pts=[];
+  for(const line of lines){
+    const num=line.match(/^(\d+[\.\)])\s+(?:\*{0,2})([^:*\-\n]+?)(?:\*{0,2})[:\-]\s*(.*)/);
+    if(num){pts.push({title:num[2].trim(),desc:cleanMd(num[3].trim())});continue;}
+    const bul=line.match(/^[-•*]\s+(?:\*{0,2})([^:*\-\n]+?)(?:\*{0,2})[:\-]\s*(.*)/);
+    if(bul){pts.push({title:bul[1].trim(),desc:cleanMd(bul[2].trim())});continue;}
+    if(line===line.toUpperCase()&&line.length>10&&line.length<120&&!/^\d/.test(line)){
+      pts.push({title:line.replace(/_/g,' ').toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()),desc:''});
+    }
+  }
+  return pts;
+}
+
+function verdictLabel(v){
+  const map={yes:'Proceed.',no:'Reconsider.',conditional:'Conditional.',balanced:'Balanced.'};
+  return map[v]||(v?v.charAt(0).toUpperCase()+v.slice(1)+'.':'—');
+}
+function renderPoints(pts,cls){
+  if(!pts.length)return'';
+  return pts.map((p,i)=>`<li class="point-item"><div class="point-index">0${i+1}</div><div>${p.title?`<div class="point-title ${cls}">${p.title}</div>`:''}<div class="point-desc">${p.desc||p.title}</div></div></li>`).join('');
+}
+
+// ── SCORE DASHBOARD ──
+const SCORE_DEFS=[
+  {key:'feasibility',cls:'feasibility'},
+  {key:'risk',cls:'risk'},
+  {key:'confidence',cls:'confidence'},
+  {key:'impact',cls:'impact'},
+  {key:'cost',cls:'cost'},
+];
+function renderScoreDashboard(scores){
+  const el=document.getElementById('scoreDashboard');
+  if(!scores||typeof scores!=='object'){el.innerHTML='';return;}
+  el.innerHTML=SCORE_DEFS.map(d=>{
+    const v=scores[d.key]??null;
+    const reason=cleanMd(scores[d.key+'_reason']||'');
+    return`<div class="score-cell">
+      <div class="score-cell-bg sbg-${d.cls}" id="sbg-${d.key}"></div>
+      <div class="score-cell-label">${d.key}</div>
+      <div class="score-cell-value sv-${d.cls}">${v!=null?v:'—'}</div>
+      <div class="score-cell-reason">${reason}</div>
+      <div class="score-cell-bar"><div class="score-cell-bar-fill sb-${d.cls}" style="width:0%" id="sb-${d.key}"></div></div>
+    </div>`;
+  }).join('');
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    SCORE_DEFS.forEach(d=>{
+      const v=scores[d.key]??0;
+      const bar=document.getElementById('sb-'+d.key);
+      const bg=document.getElementById('sbg-'+d.key);
+      if(bar)bar.style.width=v+'%';
+      if(bg)bg.style.height=v+'%';
+    });
+  }));
+}
+
+// ── BIAS ──
+function renderBias(bias){
+  const el=document.getElementById('biasBanner');
+  if(!bias||typeof bias!=='object'){el.classList.remove('visible');return;}
+  const proB=bias.pro_bias||{},conB=bias.con_bias||{};
+  const hasContent=(proB.type&&proB.type!=='none detected')||(conB.type&&conB.type!=='none detected');
+  if(!hasContent){el.classList.remove('visible');return;}
+  el.classList.add('visible');
+  const renderSide=(b,sideLabel)=>{
+    if(!b||!b.type||b.type==='none detected')return`<div><div class="bias-cell-title">${sideLabel}</div><div class="bias-cell-text">No prominent bias detected.</div></div>`;
+    return`<div>
+      <div class="bias-cell-title">${sideLabel} <span class="bias-severity ${b.severity||'low'}">${b.severity||'low'}</span></div>
+      <div class="bias-cell-text">${cleanMd(b.type)}</div>
+      ${b.evidence?`<div class="bias-cell-quote">"${cleanMd(b.evidence)}"</div>`:''}
+    </div>`;
+  };
+  el.innerHTML=renderSide(proB,'Pro side')+renderSide(conB,'Con side')+
+    `<div><div class="bias-cell-title">Overall</div><div class="bias-cell-text">${cleanMd(bias.overall_bias||'balanced')}</div></div>`;
+}
+
+// ── ROUNDS EXPLORER ──
+function renderRounds(debate){
+  const wrap=document.getElementById('roundsExplorer');
+  const rounds=Math.max((debate.pro_rounds||[]).length,(debate.con_rounds||[]).length);
+  if(rounds<=1){wrap.style.display='none';return;}
+  wrap.style.display='block';
+  const tabs=document.getElementById('roundsTabs');
+  const content=document.getElementById('roundsContent');
+  tabs.innerHTML='';content.innerHTML='';
+  for(let i=0;i<rounds;i++){
+    const tab=document.createElement('button');
+    tab.className='round-tab'+(i===rounds-1?' active':'');
+    tab.textContent=`Round ${i+1}`;
+    tab.onclick=()=>{
+      tabs.querySelectorAll('.round-tab').forEach(t=>t.classList.remove('active'));
+      tab.classList.add('active');
+      content.querySelectorAll('.round-content').forEach(c=>c.classList.remove('active'));
+      document.getElementById('round-'+i).classList.add('active');
+    };
+    addHover(tab);
+    tabs.appendChild(tab);
+
+    const div=document.createElement('div');
+    div.className='round-content'+(i===rounds-1?' active':'');
+    div.id='round-'+i;
+    div.innerHTML=`
+      <div><div class="round-side-label pro">Pro · Round ${i+1}</div><div class="round-side">${cleanMd((debate.pro_rounds||[])[i]||'(no argument)')}</div></div>
+      <div><div class="round-side-label con">Con · Round ${i+1}</div><div class="round-side">${cleanMd((debate.con_rounds||[])[i]||'(no argument)')}</div></div>
+    `;
+    content.appendChild(div);
+  }
+}
+
+// ── MAIN RENDER ──
+function renderResults(data){
+  // Uncertainty
+  const unc=data.uncertainty||{};
+  const ub=document.getElementById('uncertaintyBanner');
+  if(unc.is_ambiguous&&Array.isArray(unc.clarifications)&&unc.clarifications.length){
+    document.getElementById('uncertaintyList').innerHTML=unc.clarifications.map(q=>`<li>${cleanMd(q)}</li>`).join('');
+    ub.classList.add('visible');
+  }else{ub.classList.remove('visible');}
+
+  // Memory note
+  const mn=document.getElementById('memoryNote');
+  if(data.memory_note){mn.textContent=cleanMd(data.memory_note);mn.classList.add('visible');}else{mn.classList.remove('visible');}
+
+  // Orchestrator badge
+  const orch=data.orchestration||{};
+  const ob=document.getElementById('orchBadge');
+  ob.className='orch-badge '+(orch.complexity||'moderate');
+  ob.textContent=(orch.complexity||'moderate');
+
+  // Mode + rounds badges
+  const debate=data.debate||{};
+  const mode=debate.mode||'sequential';
+  const rounds=debate.rounds_run||1;
+  document.getElementById('modeBadge').textContent=`${mode} · ${rounds} round${rounds>1?'s':''}`;
+  document.getElementById('roundsBadge').textContent=`${mode.toUpperCase()} · ${rounds} ROUND${rounds>1?'S':''}`;
+
+  // Search badge
+  document.getElementById('searchBadge').style.display=orch.run_tools?'inline-block':'none';
+
+  // Pro / Con (final round)
+  const proFinal=cleanMd(debate.pro_final||'');
+  const conFinal=cleanMd(debate.con_final||'');
+  const ppts=parsePoints(proFinal),cpts=parsePoints(conFinal);
+  if(ppts.length===0){document.getElementById('proText').textContent=proFinal;document.getElementById('proList').innerHTML='';}
+  else{document.getElementById('proText').textContent='';document.getElementById('proList').innerHTML=renderPoints(ppts,'pro-point');}
+  if(cpts.length===0){document.getElementById('conText').textContent=conFinal;document.getElementById('conList').innerHTML='';}
+  else{document.getElementById('conText').textContent='';document.getElementById('conList').innerHTML=renderPoints(cpts,'con-point');}
+
+  // Rounds explorer (if multi-round)
+  renderRounds(debate);
+
+  // Critique
+  document.getElementById('critiqueText').textContent=cleanMd(data.critique||'');
+
+  // Final verdict (now structured)
+  const finalObj=data.final||{};
+  const verdict=(finalObj.verdict||'conditional').toLowerCase();
+  const reasoning=cleanMd(finalObj.reasoning||'');
+  const confidence=finalObj.confidence!=null?finalObj.confidence:50;
+  const conditions=Array.isArray(finalObj.conditions)?finalObj.conditions:[];
+
+  const vh=document.getElementById('verdictHeadline');
+  vh.className='verdict-headline '+verdict;
+  vh.textContent=verdictLabel(verdict);
+
+  document.getElementById('finalDecision').textContent=verdictLabel(verdict).replace('.','');
+  document.getElementById('finalBody').textContent=reasoning;
+  const condEl=document.getElementById('finalConditions');
+  if(conditions.length){
+    condEl.innerHTML=conditions.map(c=>`<div class="final-condition">${cleanMd(c)}</div>`).join('');
+  }else{condEl.innerHTML='';}
+
+  // Confidence bar
+  setTimeout(()=>{
+    document.getElementById('confBar').style.width=confidence+'%';
+    document.getElementById('confNum').textContent=confidence+'%';
+  },300);
+
+  // Scores + bias + consensus
+  renderScoreDashboard(data.scores||{});
+  renderBias(data.bias||{});
+
+  const con=data.consensus||{};
+  document.getElementById('consensusText').textContent=cleanMd(con.consensus||'');
+  document.getElementById('stabilityValue').textContent=con.stability!=null?con.stability:'—';
+  const kp=Array.isArray(con.key_points)?con.key_points:[];
+  document.getElementById('keyPoints').innerHTML=kp.map(p=>`<div class="key-point">${cleanMd(p)}</div>`).join('');
+
+  // Meta
+  const latStr=data.latency_ms?`${data.latency_ms}ms`:'';
+  document.getElementById('resultMeta').textContent=`v${data.version||'5.0'} · ${data.domain||currentDomain} · ${latStr}`;
+
+  document.getElementById('results').classList.add('visible');
+  document.getElementById('results').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+// ── ANALYZE ──
+async function runAnalysis(){
+  const query=queryInput.value.trim();
+  if(!query){queryInput.focus();return;}
+  const context=document.getElementById('contextInput').value.trim();
+  const btn=document.getElementById('analyzeBtn');
+  const loading=document.getElementById('loadingState');
+  const results=document.getElementById('results');
+  const errorStrip=document.getElementById('errorStrip');
+  const safetyBlock=document.getElementById('safetyBlock');
+  const ub=document.getElementById('uncertaintyBanner');
+  const mn=document.getElementById('memoryNote');
+  btn.disabled=true;loading.classList.add('visible');
+  results.classList.remove('visible');errorStrip.classList.remove('visible');
+  safetyBlock.classList.remove('visible');ub.classList.remove('visible');mn.classList.remove('visible');
+  startSteps();
+  try{
+    const res=await fetch('/analyze',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        text:query,
+        domain:currentDomain,
+        context,
+        run_baseline:false,
+        debate_mode:debateMode,
+        debate_rounds:2
+      })});
+    if(!res.ok)throw new Error(`Server ${res.status}`);
+    const data=await res.json();
+    stopSteps();
+    if(data.blocked){
+      document.getElementById('safetyReason').textContent=cleanMd((data.safety||{}).reason)||'Query blocked.';
+      safetyBlock.classList.add('visible');
+    }else{renderResults(data);}
+  }catch(e){
+    stopSteps();errorStrip.textContent=`Error: ${e.message}`;errorStrip.classList.add('visible');
+  }finally{btn.disabled=false;loading.classList.remove('visible');}
+}
+
+function exportPDF(){if(!document.getElementById('results').classList.contains('visible'))return;window.print();}
+
+// ── HISTORY ──
+async function loadHistory(){
+  const list=document.getElementById('historyList');
+  list.innerHTML='<div class="history-empty">Loading…</div>';
+  try{
+    const res=await fetch('/history?limit=100');if(!res.ok)throw new Error('Failed');
+    allHistory=await res.json();
+    renderHistory(allHistory);
+  }catch(e){list.innerHTML=`<div class="history-empty">Error: ${e.message}</div>`;}
+}
+function getVerdictFromItem(item){
+  if(item.blocked)return 'blocked';
+  if(item.final&&typeof item.final==='object'&&item.final.verdict)return item.final.verdict.toLowerCase();
+  return 'conditional';
+}
+function getQueryFromItem(item){return item.query||'(no query)';}
+function getReasoningFromItem(item){
+  if(item.final&&typeof item.final==='object')return item.final.reasoning||'';
+  if(typeof item.final==='string')return item.final;
+  return '';
+}
+function filterHistory(){
+  const q=document.getElementById('searchInput').value.toLowerCase();
+  const v=document.getElementById('filterVerdict').value;
+  const d=document.getElementById('filterDomain').value;
+  renderHistory(allHistory.filter(item=>{
+    const query=getQueryFromItem(item).toLowerCase();
+    const reasoning=getReasoningFromItem(item).toLowerCase();
+    const mq=!q||query.includes(q)||reasoning.includes(q);
+    const mv=!v||getVerdictFromItem(item)===v;
+    const md=!d||(item.domain||'general')===d;
+    return mq&&mv&&md;
+  }));
+}
+function renderHistory(items){
+  const list=document.getElementById('historyList');
+  if(!items.length){list.innerHTML='<div class="history-empty">No decisions found</div>';return;}
+  list.innerHTML=items.map((item,i)=>{
+    const v=getVerdictFromItem(item);
+    const date=item.created_at?new Date(item.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
+    const reasoning=cleanMd(getReasoningFromItem(item)).slice(0,140);
+    return`<div class="history-item">
+      <div class="h-index">${String(i+1).padStart(2,'0')}</div>
+      <div>
+        <div class="h-query">${cleanMd(getQueryFromItem(item))}</div>
+        <div class="h-final">${reasoning}…</div>
+        <div class="h-meta">
+          <span class="h-tag ${v}">${v==='blocked'?'Blocked':verdictLabel(v).replace('.','')}</span>
+          <span class="h-domain">${item.domain||'general'}</span>
+          <span class="h-date">${date}</span>
+        </div>
+      </div>
+      <div class="h-right">
+        <div class="h-actions">
+          <button class="h-action-btn" onclick='loadDecisionDirect(${JSON.stringify(item).replace(/'/g,"&#39;")})'>↗ Load</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  document.querySelectorAll('.history-item,.h-action-btn').forEach(addHover);
+}
+function loadDecisionDirect(item){
+  switchView('analyze');
+  queryInput.value=getQueryFromItem(item);
+  document.getElementById('charCount').textContent=queryInput.value.length;
+  renderResults(item);
+}
+</script>
+</body>
+</html>

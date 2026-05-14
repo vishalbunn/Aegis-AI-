@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Aegis AI — Observability</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Geist+Mono:wght@300;400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --ink:#0a0a0f;--paper:#f5f0e8;--gold:#c9a84c;
+  --pro:#1a6b3c;--con:#8b1a1a;--impact:#1a4a8b;--cost:#6b1a6b;
+  --rule:rgba(10,10,15,0.12);--muted:#888;
+}
+body{font-family:'Geist Mono',monospace;background:var(--paper);color:var(--ink);min-height:100vh;padding:32px 60px}
+
+.header{display:flex;align-items:flex-end;justify-content:space-between;border-bottom:1px solid var(--rule);padding-bottom:24px;margin-bottom:32px}
+.title{font-family:'Bebas Neue',sans-serif;font-size:64px;line-height:.9;letter-spacing:-.02em}
+.title em{font-family:'Instrument Serif',serif;font-style:italic;color:var(--gold)}
+.subtitle{font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:10px}
+.subtitle::before{content:'';width:30px;height:1px;background:var(--muted)}
+.status{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted)}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--pro);animation:pulse 1.5s ease infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+.grid-top{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid var(--rule);margin-bottom:32px}
+.metric-card{padding:24px;border-right:1px solid var(--rule);position:relative;overflow:hidden}
+.metric-card:last-child{border-right:none}
+.metric-label{font-size:9px;letter-spacing:.25em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+.metric-value{font-family:'Bebas Neue',sans-serif;font-size:42px;line-height:1;margin-bottom:6px}
+.metric-sub{font-size:10px;color:var(--muted);line-height:1.5}
+.mv-cost{color:var(--cost)}
+.mv-calls{color:var(--impact)}
+.mv-cache{color:var(--pro)}
+.mv-rate{color:var(--gold)}
+
+.grid-charts{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:32px}
+.chart-card{padding:24px;border:1px solid var(--rule)}
+.chart-title{font-size:10px;letter-spacing:.25em;text-transform:uppercase;color:var(--muted);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.chart-title::after{content:'';flex:1;height:1px;background:var(--rule)}
+.chart-wrap{position:relative;height:260px}
+
+.table-card{border:1px solid var(--rule);padding:24px;margin-bottom:32px}
+.table-title{font-size:10px;letter-spacing:.25em;text-transform:uppercase;color:var(--muted);margin-bottom:20px;display:flex;align-items:center;gap:8px}
+.table-title::after{content:'';flex:1;height:1px;background:var(--rule)}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--rule)}
+td{padding:14px 12px;border-bottom:1px solid var(--rule);font-size:13px}
+td:first-child{font-weight:500}
+td.num{font-family:'Bebas Neue',sans-serif;font-size:18px;text-align:right}
+tr:last-child td{border-bottom:none}
+.empty-table{padding:40px;text-align:center;color:var(--muted);font-size:11px;letter-spacing:.2em;text-transform:uppercase}
+
+.footer{display:flex;justify-content:space-between;padding-top:24px;border-top:1px solid var(--rule);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+.footer a{color:var(--ink);text-decoration:none;border-bottom:1px solid var(--rule)}
+.footer a:hover{border-color:var(--ink)}
+
+@media(max-width:900px){
+  body{padding:24px}
+  .header{flex-direction:column;align-items:flex-start;gap:14px}
+  .title{font-size:48px}
+  .grid-top{grid-template-columns:1fr 1fr}
+  .metric-card:nth-child(2){border-right:none}
+  .metric-card:nth-child(-n+2){border-bottom:1px solid var(--rule)}
+  .grid-charts{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="subtitle">Aegis AI · Observability</div>
+    <h1 class="title">DASH<em>board</em></h1>
+  </div>
+  <div class="status">
+    <div class="status-dot"></div>
+    <span id="status-text">Live — refreshing every 5s</span>
+  </div>
+</div>
+
+<!-- Top metric strip -->
+<section class="grid-top">
+  <div class="metric-card">
+    <div class="metric-label">Total Cost (USD)</div>
+    <div class="metric-value mv-cost" id="m-cost">$0.000</div>
+    <div class="metric-sub" id="m-cost-sub">No calls yet</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">LLM Calls</div>
+    <div class="metric-value mv-calls" id="m-calls">0</div>
+    <div class="metric-sub" id="m-calls-sub">0 failures</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">Cache Hit Rate</div>
+    <div class="metric-value mv-cache" id="m-cache">0%</div>
+    <div class="metric-sub" id="m-cache-sub">0 hits / 0 misses</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">Rate-Limit Blocks</div>
+    <div class="metric-value mv-rate" id="m-rate">0</div>
+    <div class="metric-sub" id="m-rate-sub">0 IPs tracked</div>
+  </div>
+</section>
+
+<!-- Charts -->
+<section class="grid-charts">
+  <div class="chart-card">
+    <div class="chart-title">Cost by Model</div>
+    <div class="chart-wrap"><canvas id="chart-cost"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-title">Token Usage</div>
+    <div class="chart-wrap"><canvas id="chart-tokens"></canvas></div>
+  </div>
+</section>
+
+<!-- Per-model table -->
+<section class="table-card">
+  <div class="table-title">Per-Model Breakdown</div>
+  <table id="model-table">
+    <thead>
+      <tr>
+        <th>Model</th>
+        <th style="text-align:right">Calls</th>
+        <th style="text-align:right">Input Tokens</th>
+        <th style="text-align:right">Output Tokens</th>
+        <th style="text-align:right">Cost (USD)</th>
+      </tr>
+    </thead>
+    <tbody id="model-tbody">
+      <tr><td colspan="5" class="empty-table">No calls recorded yet — run a query at <a href="/">/</a></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<div class="footer">
+  <span>Aegis AI v5.0 · Observability Layer</span>
+  <span><a href="/">← Back to Analyze</a></span>
+</div>
+
+<script>
+const COLORS = {
+  '8b': '#1a4a8b',
+  '70b': '#c9a84c',
+  'other': '#6b1a6b',
+};
+function modelColor(modelName) {
+  const m = (modelName || '').toLowerCase();
+  if (m.includes('70b') || m.includes('versatile')) return COLORS['70b'];
+  if (m.includes('8b') || m.includes('instant')) return COLORS['8b'];
+  return COLORS['other'];
+}
+function shortModel(name) {
+  return (name || '')
+    .replace('llama-3.1-', '')
+    .replace('llama-3.3-', '')
+    .replace('-versatile', '')
+    .replace('-instant', '');
+}
+
+let costChart = null;
+let tokensChart = null;
+
+function buildOrUpdate(chartRef, canvasId, config) {
+  if (chartRef) {
+    chartRef.data = config.data;
+    chartRef.options = config.options;
+    chartRef.update('none');
+    return chartRef;
+  }
+  return new Chart(document.getElementById(canvasId), config);
+}
+
+async function refresh() {
+  try {
+    const res = await fetch('/admin/stats');
+    if (!res.ok) throw new Error('stats endpoint returned ' + res.status);
+    const data = await res.json();
+
+    // Top metrics
+    const cost = data.cost || {};
+    const cache = data.cache || {};
+    const rl = data.rate_limiter || {};
+
+    document.getElementById('m-cost').textContent = '$' + (cost.total_cost_usd ?? 0).toFixed(4);
+    document.getElementById('m-cost-sub').textContent =
+      (cost.total_calls || 0) + ' calls · ' + ((cost.input_tokens || 0) + (cost.output_tokens || 0)).toLocaleString() + ' tokens';
+
+    document.getElementById('m-calls').textContent = (cost.total_calls || 0).toLocaleString();
+    document.getElementById('m-calls-sub').textContent = (cost.failures || 0) + ' failures';
+
+    document.getElementById('m-cache').textContent = (cache.hit_rate_pct ?? 0).toFixed(1) + '%';
+    document.getElementById('m-cache-sub').textContent =
+      (cache.hits || 0) + ' hits / ' + (cache.misses || 0) + ' misses · ' + (cache.size || 0) + '/' + (cache.max_size || 0) + ' entries';
+
+    document.getElementById('m-rate').textContent = (rl.blocked_attempts || 0).toLocaleString();
+    document.getElementById('m-rate-sub').textContent =
+      (rl.tracked_ips || 0) + ' IPs · ' + (rl.allowed_attempts || 0) + ' allowed';
+
+    // Per-model table
+    const byModel = cost.by_model || {};
+    const modelNames = Object.keys(byModel);
+    const tbody = document.getElementById('model-tbody');
+    if (modelNames.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty-table">No calls recorded yet — run a query at <a href="/">/</a></td></tr>';
+    } else {
+      tbody.innerHTML = modelNames.map(m => {
+        const v = byModel[m];
+        return `<tr>
+          <td>${m}</td>
+          <td class="num">${(v.calls || 0).toLocaleString()}</td>
+          <td class="num">${(v.in_tokens || 0).toLocaleString()}</td>
+          <td class="num">${(v.out_tokens || 0).toLocaleString()}</td>
+          <td class="num">$${(v.cost_usd || 0).toFixed(4)}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    // Cost chart
+    const labels = modelNames.map(shortModel);
+    const costs = modelNames.map(m => byModel[m].cost_usd || 0);
+    const colors = modelNames.map(modelColor);
+    costChart = buildOrUpdate(costChart, 'chart-cost', {
+      type: 'bar',
+      data: {
+        labels: labels.length ? labels : ['no data'],
+        datasets: [{
+          label: 'Cost (USD)',
+          data: costs.length ? costs : [0],
+          backgroundColor: colors.length ? colors : ['#ccc'],
+          borderWidth: 0,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { family: 'Geist Mono', size: 10 } } },
+          y: { ticks: { font: { family: 'Geist Mono', size: 10 }, callback: v => '$' + v.toFixed(3) } },
+        },
+      },
+    });
+
+    // Token chart
+    const inToks = modelNames.map(m => byModel[m].in_tokens || 0);
+    const outToks = modelNames.map(m => byModel[m].out_tokens || 0);
+    tokensChart = buildOrUpdate(tokensChart, 'chart-tokens', {
+      type: 'bar',
+      data: {
+        labels: labels.length ? labels : ['no data'],
+        datasets: [
+          { label: 'Input', data: inToks.length ? inToks : [0], backgroundColor: '#1a4a8b', borderWidth: 0 },
+          { label: 'Output', data: outToks.length ? outToks : [0], backgroundColor: '#c9a84c', borderWidth: 0 },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'top', labels: { font: { family: 'Geist Mono', size: 10 } } } },
+        scales: {
+          x: { stacked: true, grid: { display: false }, ticks: { font: { family: 'Geist Mono', size: 10 } } },
+          y: { stacked: true, ticks: { font: { family: 'Geist Mono', size: 10 } } },
+        },
+      },
+    });
+
+    document.getElementById('status-text').textContent = 'Live — last update ' + new Date().toLocaleTimeString();
+  } catch (e) {
+    document.getElementById('status-text').textContent = 'Error: ' + e.message;
+    document.querySelector('.status-dot').style.background = '#8b1a1a';
+  }
+}
+
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>

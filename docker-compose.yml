@@ -1,0 +1,33 @@
+# Aegis AI — local development & deployment
+# Usage:
+#   docker-compose up           # foreground
+#   docker-compose up -d        # detached
+#   docker-compose logs -f      # follow logs
+#   docker-compose down         # stop and remove
+
+services:
+  aegis:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: aegis-ai:5.0
+    container_name: aegis
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      AEGIS_CACHE: "1"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/admin/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    volumes:
+      - aegis-memory:/app/backend/memory
+
+volumes:
+  aegis-memory:
+    driver: local
